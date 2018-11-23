@@ -324,6 +324,9 @@ def lgbm_modeling_cross_validation(params,
     return clfs, score
 
 
+def GenUnknown(data):
+    return (0.5 + 0.5 * data["mymedian"] + 0.25 * data["mymean"] - 0.5 * data["mymax"] ** 3) / 2
+
 def predict_chunk(df_, clfs_, meta_, features, featurize_configs, train_mean):
     
     # process all features
@@ -342,17 +345,24 @@ def predict_chunk(df_, clfs_, meta_, features, featurize_configs, train_mean):
             
     preds_ = preds_ / len(clfs_)
 
-    # Compute preds_99 as the proba of class not being any of the others
-    # preds_99 = 0.1 gives 1.769
-    preds_99 = np.ones(preds_.shape[0])
-    for i in range(preds_.shape[1]):
-        preds_99 *= (1 - preds_[:, i])
-
     # Create DataFrame from predictions
     preds_df_ = pd.DataFrame(preds_, 
                              columns=['class_{}'.format(s) for s in clfs_[0].classes_])
     preds_df_['object_id'] = full_test['object_id']
-    preds_df_['class_99'] = 0.14 * preds_99 / np.mean(preds_99)
+    
+    
+    #Insert strange code, but id does improve a little bit:
+    feats = ['class_6', 'class_15', 'class_16', 'class_42', 'class_52', 'class_53',
+             'class_62', 'class_64', 'class_65', 'class_67', 'class_88', 'class_90',
+             'class_92', 'class_95']
+    
+    y = pd.DataFrame()
+    y['mymean'] = preds_df_[feats].mean(axis=1)
+    y['mymedian'] = preds_df_[feats].median(axis=1)
+    y['mymax'] = preds_df_[feats].max(axis=1)
+    
+    preds_df_['class_99'] = GenUnknown(y)
+    
     return preds_df_
 
 
